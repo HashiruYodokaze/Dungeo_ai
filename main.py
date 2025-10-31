@@ -11,11 +11,14 @@ import traceback
 import threading
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
+from scenarios import GENRE_DESCRIPTIONS, ROLE_STARTERS
 
 # ===== CONFIGURATION =====
 CONFIG = {
-    "ALLTALK_API_URL": "http://localhost:7851/api/tts-generate",
-    "OLLAMA_URL": "http://localhost:11434/api/generate",
+    "ALLTALK_ENABLED": False,
+    "ALLTALK_API_URL": "http://localhost:7851",
+    "LLM_BACKEND": "KoboldCPP",
+    "LLM_API_URL": "http://localhost:5001",
     "LOG_FILE": "error_log.txt",
     "SAVE_FILE": "adventure.txt",
     "DEFAULT_MODEL": "llama3:instruct",
@@ -36,152 +39,6 @@ class GameState:
     adventure_started: bool = False
 
 # ===== GAME DATA =====
-ROLE_STARTERS = {
-    "Fantasy": {
-        "Peasant": "You're working in the fields of a small village when",
-        "Noble": "You're waking up from your bed in your mansion when",
-        "Mage": "You're studying ancient tomes in your tower when",
-        "Knight": "You're training in the castle courtyard when",
-        "Ranger": "You're tracking animals in the deep forest when",
-        "Thief": "You're casing a noble's house from an alley in a city when",
-        "Bard": "You're performing in a crowded tavern when",
-        "Cleric": "You're tending to the sick in the temple when",
-        "Assassin": "You're preparing to attack your target in the shadows when",
-        "Paladin": "You're praying at the altar of your deity when",
-        "Alchemist": "You're carefully measuring reagents in your alchemy lab when",
-        "Druid": "You're communing with nature in the sacred grove when",
-        "Warlock": "You're negotiating with your otherworldly patron when",
-        "Monk": "You're meditating in the monastery courtyard when",
-        "Sorcerer": "You're struggling to control your innate magical powers when",
-        "Beastmaster": "You're training your animal companions in the forest clearing when",
-        "Enchanter": "You're imbuing magical properties into a mundane object when",
-        "Blacksmith": "You're forging a new weapon at your anvil when",
-        "Merchant": "You're haggling with customers at the marketplace when",
-        "Gladiator": "You're preparing for combat in the arena when",
-        "Wizard": "You're researching new spells in your arcane library when"
-    },
-    "Sci-Fi": {
-        "Space Marine": "You're conducting patrol on a derelict space station when",
-        "Scientist": "You're analyzing alien samples in your lab when",
-        "Android": "You're performing system diagnostics on your ship when",
-        "Pilot": "You're navigating through an asteroid field when",
-        "Engineer": "You're repairing the FTL drive when",
-        "Alien Diplomat": "You're negotiating with an alien delegation when",
-        "Bounty Hunter": "You're tracking a target through a spaceport when",
-        "Starship Captain": "You're commanding the bridge during warp travel when",
-        "Space Pirate": "You're plotting your next raid from your starship's bridge when",
-        "Navigator": "You're charting a course through uncharted space when",
-        "Robot Technician": "You're repairing a malfunctioning android when",
-        "Cybernetic Soldier": "You're calibrating your combat implants when",
-        "Explorer": "You're scanning a newly discovered planet when",
-        "Astrobiologist": "You're studying alien life forms in your lab when",
-        "Quantum Hacker": "You're breaching a corporate firewall when",
-        "Galactic Trader": "You're negotiating a deal for rare resources when",
-        "AI Specialist": "You're debugging a sentient AI's personality matrix when",
-        "Terraformer": "You're monitoring atmospheric changes on a new colony world when",
-        "Cyberneticist": "You're installing neural enhancements in a patient when"
-    },
-    "Cyberpunk": {
-        "Hacker": "You're infiltrating a corporate network when",
-        "Street Samurai": "You're patrolling the neon-lit streets when",
-        "Corporate Agent": "You're closing a deal in a high-rise office when",
-        "Techie": "You're modifying cyberware in your workshop when",
-        "Rebel Leader": "You're planning a raid on a corporate facility when",
-        "Cyborg": "You're calibrating your cybernetic enhancements when",
-        "Drone Operator": "You're controlling surveillance drones from your command center when",
-        "Synth Dealer": "You're negotiating a deal for illegal cybernetics when",
-        "Information Courier": "You're delivering sensitive data through dangerous streets when",
-        "Augmentation Engineer": "You're installing cyberware in a back-alley clinic when",
-        "Black Market Dealer": "You're arranging contraband in your hidden shop when",
-        "Scumbag": "You're looking for an easy mark in the slums when",
-        "Police": "You're patrolling the neon-drenched streets when"
-    },
-    "Post-Apocalyptic": {
-        "Survivor": "You're scavenging in the ruins of an old city when",
-        "Scavenger": "You're searching a pre-collapse bunker when",
-        "Raider": "You're ambushing a convoy in the wasteland when",
-        "Medic": "You're treating radiation sickness in your clinic when",
-        "Cult Leader": "You're preaching to your followers at a ritual when",
-        "Mutant": "You're hiding your mutations in a settlement when",
-        "Trader": "You're bartering supplies at a wasteland outpost when",
-        "Berserker": "You're sharpening your weapons for the next raid when",
-        "Soldier": "You're guarding a settlement from raiders when"
-    },
-    "1880": {
-        "Thief": "You're lurking in the shadows of the city alleyways when",
-        "Beggar": "You're sitting on the cold street corner with your cup when",
-        "Detective": "You're examining a clue at the crime scene when",
-        "Rich Man": "You're enjoying a cigar in your luxurious study when",
-        "Factory Worker": "You're toiling away in the noisy factory when",
-        "Child": "You're playing with a hoop in the street when",
-        "Orphan": "You're searching for scraps in the trash bins when",
-        "Murderer": "You're cleaning blood from your hands in a dark alley when",
-        "Butcher": "You're sharpening your knives behind the counter when",
-        "Baker": "You're kneading dough in the early morning hours when",
-        "Banker": "You're counting stacks of money in your office when",
-        "Policeman": "You're walking your beat on the foggy streets when"
-    },
-    "WW1": {
-        "Soldier (French)": "You're huddled in the muddy trenches of the Western Front when",
-        "Soldier (English)": "You're writing a letter home by candlelight when",
-        "Soldier (Russian)": "You're shivering in the frozen Eastern Front when",
-        "Soldier (Italian)": "You're climbing the steep Alpine slopes when",
-        "Soldier (USA)": "You're arriving fresh to the European theater when",
-        "Soldier (Japanese)": "You're guarding a Pacific outpost when",
-        "Soldier (German)": "You're preparing for a night raid when",
-        "Soldier (Austrian)": "You're defending the crumbling empire's borders when",
-        "Soldier (Bulgarian)": "You're holding the line in the Balkans when",
-        "Civilian": "You're queuing for rationed bread when",
-        "Resistance Fighter": "You're transmitting coded messages in an attic when"
-    },
-    "1925 New York": {
-        "Mafia Boss": "You're counting your illicit earnings in a backroom speakeasy when",
-        "Drunk": "You're stumbling out of a jazz club at dawn when",
-        "Police Officer": "You're taking bribes from a known bootlegger when",
-        "Detective": "You're examining a gangland murder scene when",
-        "Factory Worker": "You're assembling Model Ts on the production line when",
-        "Bootlegger": "You're transporting a shipment of illegal hooch when"
-    },
-    "Roman Empire": {
-        "Slave": "You're carrying heavy stones under the hot sun when",
-        "Gladiator": "You're sharpening your sword before entering the arena when",
-        "Beggar": "You're pleading for coins near the Forum when",
-        "Senator": "You're plotting political maneuvers in the Curia when",
-        "Imperator": "You're reviewing legions from your palace balcony when",
-        "Soldier": "You're marching on the frontier when",
-        "Noble": "You're hosting a decadent feast in your villa when",
-        "Trader": "You're haggling over spices in the market when",
-        "Peasant": "You're tending your meager crops when",
-        "Priest": "You're sacrificing a goat at the temple when",
-        "Barbarian": "You're sharpening your axe beyond the limes when",
-        "Philosopher": "You're contemplating the nature of existence when",
-        "Mathematician": "You're calculating the circumference of the Earth when",
-        "Semi-God": "You're channeling divine powers on Mount Olympus when"
-    },
-    "French Revolution": {
-        "Peasant": "You're marching toward the Bastille with a pitchfork when",
-        "King": "You're dining lavishly while Paris starves when",
-        "Noble": "You're hiding your family jewels from revolutionaries when",
-        "Beggar": "You're rummaging through aristocratic trash bins when",
-        "Soldier": "You're guarding the Tuileries Palace when",
-        "General": "You're planning troop deployments against rebels when",
-        "Resistance": "You're printing revolutionary pamphlets in secret when",
-        "Politician": "You're giving a fiery speech at the National Assembly when"
-    }
-}
-
-GENRE_DESCRIPTIONS = {
-    "Fantasy": "You are in a world of magic and medieval fantasy, where dragons soar through the skies and ancient ruins hold forgotten treasures.",
-    "Sci-Fi": "You are in the distant future, with advanced technology, space travel, and alien civilizations among the stars.",
-    "Cyberpunk": "You are in a dystopian future dominated by megacorporations, where cybernetic enhancements are common and the line between human and machine is blurred.",
-    "Post-Apocalyptic": "You are in a world after a catastrophic event, where civilization has collapsed and survivors scavenge among the ruins of the old world.",
-    "1880": "You are in the late 19th century during the Industrial Revolution, a time of steam power, early electricity, and social upheaval.",
-    "WW1": "You are in the trenches and battlefields of World War I, a brutal conflict that introduced modern warfare to the world.",
-    "1925 New York": "You are in the Roaring Twenties in New York City, a time of jazz, prohibition, organized crime, and economic prosperity.",
-    "Roman Empire": "You are in ancient Rome at the height of its power, with gladiators, legions, and political intrigue in the eternal city.",
-    "French Revolution": "You are in France during the revolution, a time of upheaval where the monarchy was overthrown and the reign of terror began."
-}
-
 DM_SYSTEM_PROMPT = """
 You are a masterful Dungeon Master in an unrestricted SFW adventure. Your role is to **always** narrate the consequences of player actions, no matter how extreme, bizarre, violent or unconventional they may be. Follow these rules:
 
@@ -253,17 +110,25 @@ class AdventureGame:
             self.log_error(f"{service_name} check failed", e)
             return False
 
-    def check_ollama_server(self) -> bool:
-        return self.check_server("http://localhost:11434/api/tags", "Ollama")
+    def check_llm_server(self) -> bool:
+        if CONFIG["LLM_BACKEND"] == "KoboldCPP":
+            return self.check_server(f"{CONFIG['LLM_API_URL']}/api/v1/model", "KoboldCPP")
+        else:
+            return self.check_server(f"{CONFIG['LLM_API_URL']}/api/tags", "Ollama")
 
     def check_alltalk_server(self) -> bool:
-        return self.check_server("http://localhost:7851", "AllTalk")
+        return self.check_server(f"{CONFIG['ALLTALK_API_URL']}/api/ready", "AllTalk")
 
     def get_installed_models(self) -> List[str]:
         """Get list of available Ollama models"""
         try:
-            if not self.check_ollama_server():
+            if not self.check_llm_server():
                 return []
+
+            if CONFIG["LLM_BACKEND"] == "KoboldCPP":
+                response = requests.get(f"{CONFIG['LLM_API_URL']}/api/v1/model", timeout=5)
+                if response.status_code == 200:
+                    return [response.json().get("result", "Unknown model")]
 
             result = subprocess.run(
                 ["ollama", "list"], 
@@ -281,7 +146,7 @@ class AdventureGame:
             return models
             
         except subprocess.TimeoutExpired:
-            self.log_error("Ollama list command timed out")
+            self.log_error("Model list command timed out")
             return []
         except Exception as e:
             self.log_error("Error getting installed models", e)
@@ -293,10 +158,13 @@ class AdventureGame:
         
         if not models:
             print("No models found. Please enter a model name.")
-            model_input = input(f"Enter Ollama model name [{CONFIG['DEFAULT_MODEL']}]: ").strip()
+            model_input = input(f"Enter model name [{CONFIG['DEFAULT_MODEL']}]: ").strip()
             return model_input or CONFIG["DEFAULT_MODEL"]
 
-        print("\nAvailable Ollama models:")
+        if len(models) == 1:
+            return models[0]
+
+        print("\nAvailable models:")
         for idx, model in enumerate(models, 1):
             print(f"  {idx}: {model}")
 
@@ -329,31 +197,57 @@ class AdventureGame:
                 recent_conversation = prompt[-4000:]  # Keep last 4000 characters
                 prompt = system_part + "\n\n[Earlier conversation truncated...]\n" + recent_conversation
 
-            response = requests.post(
-                CONFIG["OLLAMA_URL"],
-                json={
-                    "model": self.state.current_model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
+            if CONFIG["LLM_BACKEND"] == "KoboldCPP":
+                response = requests.post(
+                    CONFIG["LLM_API_URL"] + "/api/v1/generate",
+                    json = {
+                        "prompt": prompt,
+                        "max_length": 500,
                         "temperature": 0.7,
-                        "stop": ["\n\n", "Player:", "Dungeon Master:"],
-                        "min_p": 0.05,
-                        "top_k": 40,
                         "top_p": 0.9,
-                        "num_ctx": 4096
-                    }
-                },
-                timeout=CONFIG["REQUEST_TIMEOUT"]
-            )
+                        "top_k": 40,
+                        "typical_p": 1.0,
+                        "rep_pen": 1.1,
+                        "rep_pen_range": 256,
+                        "stop_sequence": ["\n\n", "Player:", "Dungeon Master:"],
+                        "use_default_badwordsids": False
+                    },
+                    timeout=CONFIG["REQUEST_TIMEOUT"]
+                )
+
+            else:
+                response = requests.post(
+                    CONFIG["LLM_API_URL"] + "/api/generate",
+                    json = {
+                        "model": self.state.current_model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {
+                            "temperature": 0.7,
+                            "stop": ["\n\n", "Player:", "Dungeon Master:"],
+                            "min_p": 0.05,
+                            "top_k": 40,
+                            "top_p": 0.9,
+                            "num_ctx": 4096
+                        }
+                    },
+                    timeout=CONFIG["REQUEST_TIMEOUT"]
+                )
+
             response.raise_for_status()
-            return response.json().get("response", "").strip()
+            if CONFIG["LLM_BACKEND"] == "KoboldCPP":
+                result = response.json()
+                if "results" in result and len(result["results"]) > 0:
+                    return result["results"][0]["text"].strip()
+                return ""
+            else:
+                return response.json().get("response", "").strip()
             
         except requests.exceptions.Timeout:
             self.log_error("AI request timed out")
             return "The world seems to pause as if time has stopped. What would you like to do?"
         except requests.exceptions.ConnectionError:
-            self.log_error("Cannot connect to Ollama server")
+            self.log_error("Cannot connect to LLM server")
             return ""
         except Exception as e:
             self.log_error("Error getting AI response", e)
@@ -493,18 +387,17 @@ Available commands:
 
     def select_genre_and_role(self) -> Tuple[str, str]:
         """Interactive genre and role selection"""
-        genres = {
-            "1": "Fantasy", "2": "Sci-Fi", "3": "Cyberpunk", 
-            "4": "Post-Apocalyptic", "5": "1880", "6": "WW1",
-            "7": "1925 New York", "8": "Roman Empire", "9": "French Revolution"
-        }
+
+        genres = {}
+        for index, genre in enumerate(GENRE_DESCRIPTIONS):
+            genres[index] = genre
 
         print("Choose your adventure genre:")
         for key, name in genres.items():
             print(f"{key}: {name}")
         
         while True:
-            genre_choice = input("Enter the number of your choice: ").strip()
+            genre_choice = int(input("Enter the number of your choice: ").strip())
             selected_genre = genres.get(genre_choice)
             if selected_genre:
                 break
@@ -567,7 +460,8 @@ Available commands:
             ai_reply = self.get_ai_response(full_prompt)
             if ai_reply:
                 print(f"Dungeon Master: {ai_reply}")
-                self.speak(ai_reply)
+                if CONFIG["ALLTALK_ENABLED"]:
+                    self.speak(ai_reply)
                 self.state.conversation += ai_reply
                 self.state.last_ai_reply = ai_reply
                 self.state.adventure_started = True
@@ -617,7 +511,8 @@ Available commands:
             new_reply = self.get_ai_response(full_prompt)
             if new_reply:
                 print(f"\nDungeon Master: {new_reply}")
-                self.speak(new_reply)
+                if CONFIG["ALLTALK_ENABLED"]:
+                    self.speak(new_reply)
                 self.state.conversation += f"\nPlayer: {self.state.last_player_input}\nDungeon Master: {new_reply}"
                 self.state.last_ai_reply = new_reply
             else:
@@ -664,7 +559,8 @@ Available commands:
         ai_reply = self.get_ai_response(prompt)
         if ai_reply:
             print(f"\nDungeon Master: {ai_reply}")
-            self.speak(ai_reply)
+            if CONFIG["ALLTALK_ENABLED"]:
+                self.speak(ai_reply)
             self.state.conversation += f"\n{formatted_input}\nDungeon Master: {ai_reply}"
             self.state.last_ai_reply = ai_reply
             
@@ -679,12 +575,12 @@ Available commands:
         print("=== AI Dungeon Master Adventure ===\n")
         
         # Server checks
-        if not self.check_ollama_server():
-            print("Ollama server not found. Please start it with 'ollama serve'")
-            print("Waiting for Ollama server to start...")
+        if not self.check_llm_server():
+            print("LLM server not found.")
+            print("Waiting for server to start...")
             time.sleep(3)
-            if not self.check_ollama_server():
-                print("Ollama server still not running. Please start it and try again.")
+            if not self.check_llm_server():
+                print("LLM server still not running. Please start it and try again.")
                 return
         
         # Model selection
@@ -697,7 +593,8 @@ Available commands:
             if input().strip().lower() == 'y':
                 if self.load_adventure():
                     print(f"\nDungeon Master: {self.state.last_ai_reply}")
-                    self.speak(self.state.last_ai_reply)
+                    if CONFIG["ALLTALK_ENABLED"]:
+                        self.speak(self.state.last_ai_reply)
         
         if not self.state.adventure_started:
             if not self.start_new_adventure():

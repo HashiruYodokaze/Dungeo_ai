@@ -1,0 +1,12 @@
+[project]
+name = "dungeo-ai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=2.2.6",
+    "requests>=2.32.5",
+    "sounddevice>=0.5.3",
+    "soundfile>=0.13.1",
+]
