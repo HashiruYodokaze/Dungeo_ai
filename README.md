@@ -1,4 +1,10 @@
 
+### Custom fork
+Forked for tinkering, experiments, KoboldCPP support, swappable/custom scenario lists, etc.
+
+### Get the actual tool at [Lazlobeer/Dungeo_ai](https://github.com/Laszlobeer/Dungeo_ai)!
+
+---
 
 ---
 
